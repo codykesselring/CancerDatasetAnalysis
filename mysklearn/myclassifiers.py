@@ -681,3 +681,223 @@ class MyDecisionTreeClassifier:
         """
         pass # TODO: (BONUS) fix this
 
+
+class MyRandomForestClassifier:
+    """Represents a random forest classifier.
+
+    Attributes:
+        n_trees(int): The number of trees (N) to generate
+        m_trees(int): The number of best trees (M) to select for the forest
+        f_attributes(int): The number of attributes (F) to randomly select at each split
+        forest(list of MyDecisionTreeClassifier): The M best decision trees
+        random_state(int): Seed for random number generation
+
+    Notes:
+        Loosely based on sklearn's RandomForestClassifier:
+            https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
+        Terminology: instance = sample = row and attribute = feature = column
+    """
+
+    def __init__(self, n_trees=20, m_trees=7, f_attributes=2, random_state=None):
+        """Initializer for MyRandomForestClassifier.
+
+        Args:
+            n_trees(int): The number of trees (N) to generate (default 20)
+            m_trees(int): The number of best trees (M) to select (default 7)
+            f_attributes(int): The number of attributes (F) to randomly select at each split (default 2)
+            random_state(int): Seed for random number generation (default None)
+        """
+        self.n_trees = n_trees
+        self.m_trees = m_trees
+        self.f_attributes = f_attributes
+        self.random_state = random_state
+        self.forest = None
+
+    def fit(self, X_train, y_train):
+        """Fits a random forest classifier to X_train and y_train using bootstrapping
+        and random attribute selection.
+
+        Args:
+            X_train(list of list of obj): The list of training instances (samples).
+                The shape of X_train is (n_train_samples, n_features)
+            y_train(list of obj): The target y values (parallel to X_train)
+                The shape of y_train is n_train_samples
+
+        Notes:
+            Generates N random decision trees using bootstrapping.
+            At each node, randomly selects F attributes as candidates for splitting.
+            Selects M most accurate trees based on validation set performance.
+        """
+        import random
+
+        if self.random_state is not None:
+            random.seed(self.random_state)
+
+        # Generate N decision trees with their validation accuracies
+        trees_with_accuracy = []
+
+        for _ in range(self.n_trees):
+            # Bootstrap sampling: create training and validation sets
+            X_sample, y_sample, X_validation, y_validation = self._bootstrap_sample(X_train, y_train)
+
+            # Create and train a decision tree with random attribute selection
+            tree = MyRandomForestDecisionTree(f_attributes=self.f_attributes, random_state=random.randint(0, 10000))
+            tree.fit(X_sample, y_sample)
+
+            # Calculate accuracy on validation set
+            if len(X_validation) > 0:
+                y_pred = tree.predict(X_validation)
+                accuracy = sum(1 for i in range(len(y_validation)) if y_pred[i] == y_validation[i]) / len(y_validation)
+            else:
+                accuracy = 0.0
+
+            trees_with_accuracy.append((tree, accuracy))
+
+        # Select M best trees based on accuracy
+        trees_with_accuracy.sort(key=lambda x: x[1], reverse=True)
+        self.forest = [tree for tree, _ in trees_with_accuracy[:self.m_trees]]
+
+    def _bootstrap_sample(self, X, y):
+        """Creates a bootstrap sample for training and a validation set from out-of-bag samples.
+
+        Args:
+            X(list of list of obj): The instances
+            y(list of obj): The labels
+
+        Returns:
+            X_sample(list of list of obj): Bootstrap sample for training
+            y_sample(list of obj): Labels for bootstrap sample
+            X_validation(list of list of obj): Out-of-bag samples for validation
+            y_validation(list of obj): Labels for validation
+        """
+        import random
+
+        n_samples = len(X)
+        sample_indices = [random.randint(0, n_samples - 1) for _ in range(n_samples)]
+
+        X_sample = [X[i] for i in sample_indices]
+        y_sample = [y[i] for i in sample_indices]
+
+        # Out-of-bag samples for validation
+        oob_indices = [i for i in range(n_samples) if i not in sample_indices]
+        X_validation = [X[i] for i in oob_indices]
+        y_validation = [y[i] for i in oob_indices]
+
+        return X_sample, y_sample, X_validation, y_validation
+
+    def predict(self, X_test):
+        """Makes predictions for test instances in X_test using majority voting
+        across the M decision trees in the forest.
+
+        Args:
+            X_test(list of list of obj): The list of testing samples
+                The shape of X_test is (n_test_samples, n_features)
+
+        Returns:
+            y_predicted(list of obj): The predicted target y values (parallel to X_test)
+        """
+        y_predicted = []
+
+        for instance in X_test:
+            # Get predictions from all trees in the forest
+            predictions = [tree.predict([instance])[0] for tree in self.forest]
+
+            # Majority voting
+            prediction_counts = {}
+            for pred in predictions:
+                prediction_counts[pred] = prediction_counts.get(pred, 0) + 1
+
+            # Select most common prediction
+            majority_prediction = max(prediction_counts, key=prediction_counts.get)
+            y_predicted.append(majority_prediction)
+
+        return y_predicted
+
+
+class MyRandomForestDecisionTree(MyDecisionTreeClassifier):
+    """A decision tree classifier that uses random attribute selection for random forests.
+
+    Attributes:
+        f_attributes(int): Number of attributes to randomly select at each split
+        random_state(int): Seed for random number generation
+    """
+
+    def __init__(self, f_attributes=2, random_state=None):
+        """Initializer for MyRandomForestDecisionTree.
+
+        Args:
+            f_attributes(int): Number of attributes to randomly select at each split
+            random_state(int): Seed for random number generation
+        """
+        super().__init__()
+        self.f_attributes = f_attributes
+        self.random_state = random_state
+
+    def fit(self, X_train, y_train):
+        """Fits a decision tree classifier with random attribute selection.
+
+        Args:
+            X_train(list of list of obj): The list of training instances (samples).
+                The shape of X_train is (n_train_samples, n_features)
+            y_train(list of obj): The target y values (parallel to X_train)
+                The shape of y_train is n_train_samples
+        """
+        import random
+
+        if self.random_state is not None:
+            random.seed(self.random_state)
+
+        self.X_train = X_train
+        self.y_train = y_train
+
+        available_attributes = list(range(len(X_train[0])))
+
+        self.tree = self._tdidt_random(X_train, y_train, available_attributes, len(y_train))
+
+    def _tdidt_random(self, X, y, available_attributes, parent_total):
+        """TDIDT algorithm with random attribute selection.
+
+        Args:
+            X(list of list of obj): Current instances
+            y(list of obj): Current labels
+            available_attributes(list of int): Available attribute indices
+            parent_total(int): Total instances in parent partition
+
+        Returns:
+            tree(nested list): The decision tree
+        """
+        import random
+
+        # Base case 1: All labels are the same
+        if len(set(y)) == 1:
+            return ["Leaf", y[0], len(y), parent_total]
+
+        # Base case 2: No more attributes available
+        if len(available_attributes) == 0:
+            return ["Leaf", self._majority_vote(y), len(y), parent_total]
+
+        # Randomly select F attributes from available attributes
+        f = min(self.f_attributes, len(available_attributes))
+        random_attributes = random.sample(available_attributes, f)
+
+        # Select best attribute from the random subset
+        best_attr = self._select_attribute(X, y, random_attributes)
+
+        remaining_attributes = [attr for attr in available_attributes if attr != best_attr]
+
+        tree = ["Attribute", f"att{best_attr}"]
+
+        partitions = self._partition_by_attribute(X, y, best_attr)
+
+        sorted_values = sorted(partitions.keys())
+
+        for value in sorted_values:
+            X_partition = partitions[value]['X']
+            y_partition = partitions[value]['y']
+
+            subtree = self._tdidt_random(X_partition, y_partition, remaining_attributes, len(y))
+
+            tree.append(["Value", value, subtree])
+
+        return tree
+
