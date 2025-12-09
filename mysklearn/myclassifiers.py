@@ -1,5 +1,6 @@
 from mysklearn import myutils
 
+from mysklearn import myutils
 
 class MyKNeighborsClassifier:
     """Represents a simple k nearest neighbors classifier.
@@ -631,11 +632,17 @@ class MyRandomForestClassifier:
         f_attributes(int): The number of attributes (F) to randomly select at each split
         forest(list of MyDecisionTreeClassifier): The M best decision trees
         random_state(int): Seed for random number generation
+        X_test(list of list of obj): The stratified test set (1/3 of original data)
+        y_test(list of obj): Labels for test set
+        X_remainder(list of list of obj): The remainder set (2/3 of original data)
+        y_remainder(list of obj): Labels for remainder set
 
     Notes:
         Loosely based on sklearn's RandomForestClassifier:
             https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
         Terminology: instance = sample = row and attribute = feature = column
+
+        Pre-processing: Automatically creates a stratified 1/3 test, 2/3 remainder split
     """
 
     def __init__(self, n_trees=20, m_trees=7, f_attributes=2, random_state=None):
@@ -652,19 +659,24 @@ class MyRandomForestClassifier:
         self.f_attributes = f_attributes
         self.random_state = random_state
         self.forest = None
+        self.X_test = None
+        self.y_test = None
+        self.X_remainder = None
+        self.y_remainder = None
 
     def fit(self, X_train, y_train):
         """Fits a random forest classifier to X_train and y_train using bootstrapping
         and random attribute selection.
 
         Args:
-            X_train(list of list of obj): The list of training instances (samples).
+            X_train(list of list of obj): The FULL original dataset instances (samples).
                 The shape of X_train is (n_train_samples, n_features)
-            y_train(list of obj): The target y values (parallel to X_train)
+            y_train(list of obj): The target y values for the FULL original dataset (parallel to X_train)
                 The shape of y_train is n_train_samples
 
         Notes:
-            Generates N random decision trees using bootstrapping.
+            Pre-processing: Creates a stratified 1/3 test, 2/3 remainder split.
+            Generates N random decision trees using bootstrapping over the remainder set.
             At each node, randomly selects F attributes as candidates for splitting.
             Selects M most accurate trees based on validation set performance.
         """
@@ -673,12 +685,19 @@ class MyRandomForestClassifier:
         if self.random_state is not None:
             random.seed(self.random_state)
 
-        # Generate N decision trees with their validation accuracies
+        # PRE-PROCESSING STEP: Create stratified 1/3 test, 2/3 remainder split
+        self.X_remainder, self.y_remainder, self.X_test, self.y_test = self._stratified_split(
+            X_train, y_train, test_size=1/3
+        )
+
+        # Generate N decision trees with their validation accuracies using REMAINDER SET
         trees_with_accuracy = []
 
         for _ in range(self.n_trees):
-            # Bootstrap sampling: create training and validation sets
-            X_sample, y_sample, X_validation, y_validation = self._bootstrap_sample(X_train, y_train)
+            # Bootstrap sampling: create training and validation sets from REMAINDER SET
+            X_sample, y_sample, X_validation, y_validation = self._bootstrap_sample(
+                self.X_remainder, self.y_remainder
+            )
 
             # Create and train a decision tree with random attribute selection
             tree = MyRandomForestDecisionTree(f_attributes=self.f_attributes, random_state=random.randint(0, 10000))
@@ -696,6 +715,47 @@ class MyRandomForestClassifier:
         # Select M best trees based on accuracy
         trees_with_accuracy.sort(key=lambda x: x[1], reverse=True)
         self.forest = [tree for tree, _ in trees_with_accuracy[:self.m_trees]]
+
+    def _stratified_split(self, X, y, test_size=1/3):
+        """Creates a stratified split of the data into remainder and test sets.
+
+        Args:
+            X(list of list of obj): The instances
+            y(list of obj): The labels
+            test_size(float): Proportion of data to use for test set (default 1/3)
+
+        Returns:
+            X_remainder(list of list of obj): Remainder set (2/3 by default)
+            y_remainder(list of obj): Labels for remainder set
+            X_test(list of list of obj): Test set (1/3 by default)
+            y_test(list of obj): Labels for test set
+        """
+        import random
+
+        # Group indices by class label
+        class_indices = {}
+        for i, label in enumerate(y):
+            if label not in class_indices:
+                class_indices[label] = []
+            class_indices[label].append(i)
+
+        # Shuffle indices within each class and split stratified
+        test_indices = []
+        remainder_indices = []
+
+        for label, indices in class_indices.items():
+            random.shuffle(indices)
+            n_test = int(len(indices) * test_size)
+            test_indices.extend(indices[:n_test])
+            remainder_indices.extend(indices[n_test:])
+
+        # Create the split datasets
+        X_remainder = [X[i] for i in remainder_indices]
+        y_remainder = [y[i] for i in remainder_indices]
+        X_test = [X[i] for i in test_indices]
+        y_test = [y[i] for i in test_indices]
+
+        return X_remainder, y_remainder, X_test, y_test
 
     def _bootstrap_sample(self, X, y):
         """Creates a bootstrap sample for training and a validation set from out-of-bag samples.
@@ -752,6 +812,15 @@ class MyRandomForestClassifier:
             y_predicted.append(majority_prediction)
 
         return y_predicted
+
+    def get_test_set(self):
+        """Returns the stratified test set created during fit().
+
+        Returns:
+            X_test(list of list of obj): Test set instances
+            y_test(list of obj): Test set labels
+        """
+        return self.X_test, self.y_test
 
 
 class MyRandomForestDecisionTree(MyDecisionTreeClassifier):

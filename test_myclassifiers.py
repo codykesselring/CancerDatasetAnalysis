@@ -1,6 +1,6 @@
 import numpy as np
 
-from mysklearn.myclassifiers import MyDecisionTreeClassifier, MyRandomForestClassifier
+from mysklearn.myclassifiers import MyDecisionTreeClassifier, MyRandomForestClassifier, MyNaiveBayesClassifier
 
 
 
@@ -46,8 +46,6 @@ def test_decision_tree_classifier_fit():
     ]
     y_train_interview = ["False", "False", "True", "True", "True", "False", "True", "False", "True", "True", "True", "True", "True", "False"]
 
-    # note: this tree uses the generic "att#" attribute labels because fit() does not and should not accept attribute names
-    # note: the attribute values are sorted alphabetically
     tree_interview = \
             ["Attribute", "att0",
                 ["Value", "Junior",
@@ -75,14 +73,10 @@ def test_decision_tree_classifier_fit():
                 ]
             ]
 
-    # Test interview dataset
     dt_classifier = MyDecisionTreeClassifier()
     dt_classifier.fit(X_train_interview, y_train_interview)
     assert dt_classifier.tree == tree_interview
 
-    # Expected tree for iPhone dataset (from desk check)
-    # Note: attribute values are sorted alphabetically/numerically
-    # Note: for clashes with ties, choose alphabetically first class label
     tree_iphone = \
             ["Attribute", "att2",
                 ["Value", "excellent",
@@ -131,7 +125,6 @@ def test_decision_tree_classifier_fit():
                 ]
             ]
 
-    # Test iPhone dataset
     dt_classifier_iphone = MyDecisionTreeClassifier()
     dt_classifier_iphone.fit(X_train_iphone, y_train_iphone)
     assert dt_classifier_iphone.tree == tree_iphone
@@ -178,8 +171,6 @@ def test_decision_tree_classifier_predict():
     ]
     y_train_interview = ["False", "False", "True", "True", "True", "False", "True", "False", "True", "True", "True", "True", "True", "False"]
 
-    # note: this tree uses the generic "att#" attribute labels because fit() does not and should not accept attribute names
-    # note: the attribute values are sorted alphabetically
     tree_interview = \
             ["Attribute", "att0",
                 ["Value", "Junior",
@@ -208,11 +199,6 @@ def test_decision_tree_classifier_predict():
             ]
 
     # Test interview dataset predictions
-    # From B Attribute Selection (Entropy) Lab Task #2
-    # Test instance 1: ["Junior", "Java", "yes", "no"] -> should predict "True"
-    #   (path: level=Junior -> phd=no -> Leaf "True")
-    # Test instance 2: ["Junior", "Java", "yes", "yes"] -> should predict "False"
-    #   (path: level=Junior -> phd=yes -> Leaf "False")
     X_test_interview = [
         ["Junior", "Java", "yes", "no"],
         ["Junior", "Java", "yes", "yes"]
@@ -225,10 +211,6 @@ def test_decision_tree_classifier_predict():
     assert predictions == y_predicted_interview
 
     # Test iPhone dataset predictions
-    # Test instance 1: [2, 2, "fair"]
-    #   -> standing=2 -> credit_rating="fair" -> Leaf "yes"
-    # Test instance 2: [1, 1, "excellent"]
-    #   -> standing=1 -> job_status=1 -> Leaf "yes"
     X_test_iphone = [
         [2, 2, "fair"],
         [1, 1, "excellent"]
@@ -242,7 +224,6 @@ def test_decision_tree_classifier_predict():
 
 
 def test_random_forest_classifier_fit():
-    """Test that MyRandomForestClassifier.fit() creates N trees and selects M best trees."""
     # Interview dataset
     X_train_interview = [
         ["Senior", "Java", "no", "no"],
@@ -262,7 +243,6 @@ def test_random_forest_classifier_fit():
     ]
     y_train_interview = ["False", "False", "True", "True", "True", "False", "True", "False", "True", "True", "True", "True", "True", "False"]
 
-    # Test with specific parameters
     n_trees = 10
     m_trees = 5
     f_attributes = 2
@@ -270,18 +250,15 @@ def test_random_forest_classifier_fit():
     rf_classifier = MyRandomForestClassifier(n_trees=n_trees, m_trees=m_trees, f_attributes=f_attributes, random_state=42)
     rf_classifier.fit(X_train_interview, y_train_interview)
 
-    # Check that the forest has exactly M trees
     assert rf_classifier.forest is not None
     assert len(rf_classifier.forest) == m_trees
 
-    # Check that all trees in the forest are decision tree objects
     for tree in rf_classifier.forest:
         assert tree.tree is not None
         assert isinstance(tree.tree, list)
 
 
 def test_random_forest_classifier_predict():
-    """Test that MyRandomForestClassifier.predict() uses majority voting correctly."""
     # Interview dataset
     X_train_interview = [
         ["Senior", "Java", "no", "no"],
@@ -307,15 +284,12 @@ def test_random_forest_classifier_predict():
         ["Mid", "Python", "no", "no"]
     ]
 
-    # Test with reproducible random state
     rf_classifier = MyRandomForestClassifier(n_trees=20, m_trees=7, f_attributes=2, random_state=42)
     rf_classifier.fit(X_train_interview, y_train_interview)
     predictions = rf_classifier.predict(X_test_interview)
 
-    # Check that predictions are returned for all test instances
     assert len(predictions) == len(X_test_interview)
 
-    # Check that all predictions are valid class labels
     valid_labels = set(y_train_interview)
     for pred in predictions:
         assert pred in valid_labels
@@ -348,26 +322,20 @@ def test_random_forest_classifier_with_iphone_dataset():
         [2, 3, "excellent"]
     ]
 
-    # Test with different parameters
     rf_classifier = MyRandomForestClassifier(n_trees=15, m_trees=10, f_attributes=2, random_state=123)
     rf_classifier.fit(X_train_iphone, y_train_iphone)
     predictions = rf_classifier.predict(X_test_iphone)
 
-    # Check that predictions are returned
     assert len(predictions) == len(X_test_iphone)
 
-    # Check that predictions are valid
     valid_labels = {"yes", "no"}
     for pred in predictions:
         assert pred in valid_labels
 
-    # Check that the forest has the correct number of trees
     assert len(rf_classifier.forest) == 10
 
 
 def test_random_forest_classifier_majority_voting():
-    """Test that random forest uses majority voting for predictions."""
-    # Simple dataset where majority voting matters
     X_train = [
         ["A", "X"],
         ["A", "Y"],
@@ -382,18 +350,15 @@ def test_random_forest_classifier_majority_voting():
 
     X_test = [["A", "X"], ["B", "Y"]]
 
-    # Use a fixed random state for reproducibility
     rf_classifier = MyRandomForestClassifier(n_trees=10, m_trees=5, f_attributes=1, random_state=0)
     rf_classifier.fit(X_train, y_train)
     predictions = rf_classifier.predict(X_test)
 
-    # Verify predictions are valid
     assert len(predictions) == 2
     assert all(pred in ["yes", "no"] for pred in predictions)
 
 
 def test_random_forest_classifier_different_f_values():
-    """Test random forest with different F (number of random attributes) values."""
     X_train = [
         [1, 2, 3, 4],
         [1, 3, 4, 5],
@@ -406,25 +371,245 @@ def test_random_forest_classifier_different_f_values():
 
     X_test = [[1, 2, 3, 5], [2, 3, 4, 4]]
 
-    # Test with F=1 (select 1 random attribute at each split)
     rf_f1 = MyRandomForestClassifier(n_trees=5, m_trees=3, f_attributes=1, random_state=10)
     rf_f1.fit(X_train, y_train)
     pred_f1 = rf_f1.predict(X_test)
 
-    # Test with F=2 (select 2 random attributes at each split)
     rf_f2 = MyRandomForestClassifier(n_trees=5, m_trees=3, f_attributes=2, random_state=10)
     rf_f2.fit(X_train, y_train)
     pred_f2 = rf_f2.predict(X_test)
 
-    # Test with F=3 (select 3 random attributes at each split)
     rf_f3 = MyRandomForestClassifier(n_trees=5, m_trees=3, f_attributes=3, random_state=10)
     rf_f3.fit(X_train, y_train)
     pred_f3 = rf_f3.predict(X_test)
 
-    # All should produce valid predictions
     assert len(pred_f1) == 2
     assert len(pred_f2) == 2
     assert len(pred_f3) == 2
     assert all(p in ["A", "B"] for p in pred_f1)
     assert all(p in ["A", "B"] for p in pred_f2)
     assert all(p in ["A", "B"] for p in pred_f3)
+
+def test_naive_bayes_classifier_fit():
+    # in-class Naive Bayes example (lab task #1)
+    header_inclass_example = ["att1", "att2"]
+    X_train_inclass_example = [
+        [1, 5], # yes
+        [2, 6], # yes
+        [1, 5], # no
+        [1, 5], # no
+        [1, 6], # yes
+        [2, 6], # no
+        [1, 5], # yes
+        [1, 6] # yes
+    ]
+    y_train_inclass_example = ["yes", "yes", "no", "no", "yes", "no", "yes", "yes"]
+
+    # iPhone purchases dataset
+    header_iphone = ["standing", "job_status", "credit_rating"]
+    X_train_iphone = [
+        [1, 3, "fair"],
+        [1, 3, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "fair"],
+        [2, 1, "fair"],
+        [2, 1, "excellent"],
+        [2, 1, "excellent"],
+        [1, 2, "fair"],
+        [1, 1, "fair"],
+        [2, 2, "fair"],
+        [1, 2, "excellent"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"]
+    ]
+    y_train_iphone = ["no", "no", "yes", "yes", "yes", "no", "yes", "no", "yes", "yes", "yes", "yes", "yes", "no", "yes"]
+
+    # Bramer 3.2 train dataset
+    header_train = ["day", "season", "wind", "rain"]
+    X_train_train = [
+        ["weekday", "spring", "none", "none"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "high", "heavy"],
+        ["saturday", "summer", "normal", "none"],
+        ["weekday", "autumn", "normal", "none"],
+        ["holiday", "summer", "high", "slight"],
+        ["sunday", "summer", "normal", "none"],
+        ["weekday", "winter", "high", "heavy"],
+        ["weekday", "summer", "none", "slight"],
+        ["saturday", "spring", "high", "heavy"],
+        ["weekday", "summer", "high", "slight"],
+        ["saturday", "winter", "normal", "none"],
+        ["weekday", "summer", "high", "none"],
+        ["weekday", "winter", "normal", "heavy"],
+        ["saturday", "autumn", "high", "slight"],
+        ["weekday", "autumn", "none", "heavy"],
+        ["holiday", "spring", "normal", "slight"],
+        ["weekday", "spring", "normal", "none"],
+        ["weekday", "spring", "normal", "slight"]
+    ]
+    y_train_train = ["on time", "on time", "on time", "late", "on time", "very late", "on time",
+                    "on time", "very late", "on time", "cancelled", "on time", "late", "on time",
+                    "very late", "on time", "on time", "on time", "on time", "on time"]
+
+    # Test Case 1: In-class example
+    nb1 = MyNaiveBayesClassifier()
+    nb1.fit(X_train_inclass_example, y_train_inclass_example)
+
+    assert np.isclose(nb1.priors["yes"], 5/8)
+    assert np.isclose(nb1.priors["no"], 3/8)
+
+    assert np.isclose(nb1.conditionals["yes"][0][1], 4/5)  # P(att1=1|yes)
+    assert np.isclose(nb1.conditionals["yes"][0][2], 1/5)  # P(att1=2|yes)
+    assert np.isclose(nb1.conditionals["yes"][1][5], 2/5)  # P(att2=5|yes)
+    assert np.isclose(nb1.conditionals["yes"][1][6], 3/5)  # P(att2=6|yes)
+
+    assert np.isclose(nb1.conditionals["no"][0][1], 2/3)  # P(att1=1|no)
+    assert np.isclose(nb1.conditionals["no"][0][2], 1/3)  # P(att1=2|no)
+    assert np.isclose(nb1.conditionals["no"][1][5], 2/3)  # P(att2=5|no)
+    assert np.isclose(nb1.conditionals["no"][1][6], 1/3)  # P(att2=6|no)
+
+    # Test Case 2: iPhone dataset
+    nb2 = MyNaiveBayesClassifier()
+    nb2.fit(X_train_iphone, y_train_iphone)
+
+    assert np.isclose(nb2.priors["yes"], 10/15)
+    assert np.isclose(nb2.priors["no"], 5/15)
+
+    assert np.isclose(nb2.conditionals["yes"][0][1], 2/10)  # P(standing=1|yes)
+    assert np.isclose(nb2.conditionals["yes"][0][2], 8/10)  # P(standing=2|yes)
+    assert np.isclose(nb2.conditionals["yes"][1][1], 3/10)  # P(job_status=1|yes)
+    assert np.isclose(nb2.conditionals["yes"][1][2], 4/10)  # P(job_status=2|yes)
+    assert np.isclose(nb2.conditionals["yes"][1][3], 3/10)  # P(job_status=3|yes)
+    assert np.isclose(nb2.conditionals["yes"][2]["fair"], 7/10)  # P(credit_rating=fair|yes)
+    assert np.isclose(nb2.conditionals["yes"][2]["excellent"], 3/10)  # P(credit_rating=excellent|yes)
+
+    assert np.isclose(nb2.conditionals["no"][0][1], 3/5)  # P(standing=1|no)
+    assert np.isclose(nb2.conditionals["no"][0][2], 2/5)  # P(standing=2|no)
+    assert np.isclose(nb2.conditionals["no"][1][1], 1/5)  # P(job_status=1|no)
+    assert np.isclose(nb2.conditionals["no"][1][2], 2/5)  # P(job_status=2|no)
+    assert np.isclose(nb2.conditionals["no"][1][3], 2/5)  # P(job_status=3|no)
+    assert np.isclose(nb2.conditionals["no"][2]["fair"], 2/5)  # P(credit_rating=fair|no)
+    assert np.isclose(nb2.conditionals["no"][2]["excellent"], 3/5)  # P(credit_rating=excellent|no)
+
+    # Test Case 3: Bramer 3.2 dataset
+    nb3 = MyNaiveBayesClassifier()
+    nb3.fit(X_train_train, y_train_train)
+
+    assert np.isclose(nb3.priors["on time"], 14/20)
+    assert np.isclose(nb3.priors["late"], 2/20)
+    assert np.isclose(nb3.priors["very late"], 3/20)
+    assert np.isclose(nb3.priors["cancelled"], 1/20)
+
+    assert np.isclose(nb3.conditionals["on time"][0]["weekday"], 9/14)  # P(day=weekday|on time)
+    assert np.isclose(nb3.conditionals["on time"][0]["saturday"], 2/14)  # P(day=saturday|on time)
+    assert np.isclose(nb3.conditionals["on time"][0]["sunday"], 1/14)  # P(day=sunday|on time)
+    assert np.isclose(nb3.conditionals["on time"][0]["holiday"], 2/14)  # P(day=holiday|on time)
+
+    assert np.isclose(nb3.conditionals["on time"][1]["spring"], 4/14)  # P(season=spring|on time)
+    assert np.isclose(nb3.conditionals["on time"][1]["summer"], 6/14)  # P(season=summer|on time)
+    assert np.isclose(nb3.conditionals["on time"][1]["autumn"], 2/14)  # P(season=autumn|on time)
+    assert np.isclose(nb3.conditionals["on time"][1]["winter"], 2/14)  # P(season=winter|on time)
+
+    assert np.isclose(nb3.conditionals["on time"][2]["none"], 5/14)  # P(wind=none|on time)
+    assert np.isclose(nb3.conditionals["on time"][2]["normal"], 5/14)  # P(wind=normal|on time)
+    assert np.isclose(nb3.conditionals["on time"][2]["high"], 4/14)  # P(wind=high|on time)
+
+    assert np.isclose(nb3.conditionals["on time"][3]["none"], 5/14)  # P(rain=none|on time)
+    assert np.isclose(nb3.conditionals["on time"][3]["slight"], 8/14)  # P(rain=slight|on time)
+    assert np.isclose(nb3.conditionals["on time"][3]["heavy"], 1/14)  # P(rain=heavy|on time)
+
+def test_naive_bayes_classifier_predict():
+    # in-class Naive Bayes example (lab task #1)
+    header_inclass_example = ["att1", "att2"]
+    X_train_inclass_example = [
+        [1, 5], # yes
+        [2, 6], # yes
+        [1, 5], # no
+        [1, 5], # no
+        [1, 6], # yes
+        [2, 6], # no
+        [1, 5], # yes
+        [1, 6] # yes
+    ]
+    y_train_inclass_example = ["yes", "yes", "no", "no", "yes", "no", "yes", "yes"]
+
+    # iPhone purchases dataset
+    header_iphone = ["standing", "job_status", "credit_rating"]
+    X_train_iphone = [
+        [1, 3, "fair"],
+        [1, 3, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "fair"],
+        [2, 1, "fair"],
+        [2, 1, "excellent"],
+        [2, 1, "excellent"],
+        [1, 2, "fair"],
+        [1, 1, "fair"],
+        [2, 2, "fair"],
+        [1, 2, "excellent"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"]
+    ]
+    y_train_iphone = ["no", "no", "yes", "yes", "yes", "no", "yes", "no", "yes", "yes", "yes", "yes", "yes", "no", "yes"]
+
+    # Bramer 3.2 train dataset
+    header_train = ["day", "season", "wind", "rain"]
+    X_train_train = [
+        ["weekday", "spring", "none", "none"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "high", "heavy"],
+        ["saturday", "summer", "normal", "none"],
+        ["weekday", "autumn", "normal", "none"],
+        ["holiday", "summer", "high", "slight"],
+        ["sunday", "summer", "normal", "none"],
+        ["weekday", "winter", "high", "heavy"],
+        ["weekday", "summer", "none", "slight"],
+        ["saturday", "spring", "high", "heavy"],
+        ["weekday", "summer", "high", "slight"],
+        ["saturday", "winter", "normal", "none"],
+        ["weekday", "summer", "high", "none"],
+        ["weekday", "winter", "normal", "heavy"],
+        ["saturday", "autumn", "high", "slight"],
+        ["weekday", "autumn", "none", "heavy"],
+        ["holiday", "spring", "normal", "slight"],
+        ["weekday", "spring", "normal", "none"],
+        ["weekday", "spring", "normal", "slight"]
+    ]
+    y_train_train = ["on time", "on time", "on time", "late", "on time", "very late", "on time",
+                    "on time", "very late", "on time", "cancelled", "on time", "late", "on time",
+                    "very late", "on time", "on time", "on time", "on time", "on time"]
+
+    # Test Case 1: In-class example - test with [2, 6]
+    nb1 = MyNaiveBayesClassifier()
+    nb1.fit(X_train_inclass_example, y_train_inclass_example)
+
+    y_pred1 = nb1.predict([[2, 6]])
+    assert y_pred1 == ["yes"]
+
+    # Test Case 2: iPhone dataset
+    nb2 = MyNaiveBayesClassifier()
+    nb2.fit(X_train_iphone, y_train_iphone)
+
+    y_pred2_test1 = nb2.predict([[2, 2, "fair"]])
+    assert y_pred2_test1 == ["yes"]
+
+    y_pred2_test2 = nb2.predict([[1, 1, "excellent"]])
+    assert y_pred2_test2 == ["no"]
+
+    nb3 = MyNaiveBayesClassifier()
+    nb3.fit(X_train_train, y_train_train)
+
+    y_pred3 = nb3.predict([["weekday", "winter", "high", "heavy"]])
+    assert y_pred3 == ["very late"] 
+
+    y_pred3_ex1 = nb3.predict([["weekday", "summer", "high", "heavy"]])
+    assert y_pred3_ex1 == ["on time"] 
+
+    y_pred3_ex2 = nb3.predict([["sunday", "summer", "normal", "slight"]])
+    assert y_pred3_ex2 == ["on time"]  
